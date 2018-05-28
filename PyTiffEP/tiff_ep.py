@@ -16,8 +16,43 @@ IFD_FIELD_TYPES = [(1, 'BYTE'), (1, 'ASCII'), (2, 'SHORT'), (4, 'LONG'), (8, 'RA
 
 
 IFD_TAGS = {
+    'NewSubfileType': 254,
     'SubIFDs': 330,
-    'ExifIFD': 34665
+    'ExifIFD': 34665,
+    'ExposureTime': 33434,
+    'FNumber': 33437,
+    'ExposureProgram': 34850,
+    'ISOSpeedRatings': 34855,
+    'ExifVersion': 36864,
+    'DateTimeOriginal': 36867,
+    'DateTimeDigitized': 36868,
+    'ComponentsConfiguration': 37121,
+    'CompressedBitsPerPixel': 37122,
+    'BrightnessValue': 37379,
+    'ExposureBiasValue': 37380,
+    'MaxApertureValue': 37381,
+    'MeteringMode': 37383,
+    'LightSource': 37384,
+    'Flash': 37385,
+    'FocalLength': 37386,
+    'MakerNote': 37500
+    'UserComment': 37510,
+    'FlashpixVersion': 40960
+    'ColorSpace': 40961,
+    'PixelXDimension': 40962,
+    'PixelYDimension': 40963,
+    'InteroperabilityIFD': 40965,
+    'FileSource': 41728,
+    'SceneType': 41729,
+    'CustomRendered': 41985,
+    'ExposureMode': 41986,
+    'WhiteBalance': 41987,
+    'DigitalZoomRatio': 41988,
+    'FocalLengthIn35mmFilm': 41989,
+    'SceneCaptureType': 41990,
+    'Contrast': 41992,
+    'Saturation': 41993,
+    'Sharpness': 41994,
 }
 
 
@@ -198,23 +233,33 @@ class IFD(OrderedDict):
         self.next = read_integer(open_file.read(4), endianness)
 
     def __getitem__(self, key):
-        if isinstance(key, six.string_type()):
+        if isinstance(key, six.string_types):
             return self[IFD_TAGS[key]]
-        super(IFD, self).__getitem__(key)
+        return super(IFD, self).__getitem__(key)
+
+    def get(self, key, default=None):
+        # Apparently __getitem__ doesn't apply for "get"...
+        if isinstance(key, six.string_types):
+            return self.get(IFD_TAGS[key], default)
+        return super(IFD, self).get(key, default)
 
     def sub_ifd_offsets(self):
-        return self.get('SubIFDs', [])
+        return self.get('SubIFDs') 
 
-    def exif_ifd_offests(self):
-        return self.get('ExifIFD', [])
+    def exif_ifd_offsets(self):
+        return self.get('ExifIFD') 
 
     def sub_ifds(self, open_file):
         offsets = self.sub_ifd_offsets()
-        return [IFD(open_file, offset, self.endianness) for offset in offsets] 
+        if offsets:
+            offsets = offsets.values(open_file)
+            return [IFD(open_file, offset, self.endianness) for offset in offsets] 
 
     def exif_ifds(self, open_file):
         offsets = self.exif_ifd_offsets()
-        return [IFD(open_file, offset, self.endianness) for offset in offsets] 
+        if offsets:
+            offsets = offsets.values(open_file)
+            return [IFD(open_file, offset, self.endianness) for offset in offsets] 
 
 
 class TiffEp(object):
@@ -233,33 +278,4 @@ class TiffEp(object):
             result.append(ifd)
 
         return result
-
-
-if __name__ == '__main__': 
-    with open('file.ARW', 'rb') as f:
-        endianness = get_endianness(f)
-
-        ifd_offset = get_ifd_offset(f, endianness)
-
-        next_ifd = ifd_offset 
-        while next_ifd:
-            print('\n\n{}\n================\n================'.format(next_ifd))
-            ifd, next_ifd = get_ifd(f, next_ifd, endianness)
-
-
-            for field in ifd.values():
-                print(field)
-                if field.requires_file():
-                    print('\tReal value: {}'.format(field.values(f)))
-
-            if ifd.get(IFD_TAGS['SubIFDs']):
-                subifd_offset = ifd.get(IFD_TAGS['SubIFDs']).values()[0]
-
-                if subifd_offset:
-                    subifd, _ = get_ifd(f, subifd_offset, endianness)
-                    print('\n\n[[[[[[SUB IFD]]]]]]')
-                    for field in subifd.values():
-                        print(field)
-                        if field.requires_file():
-                            print('\tReal value: {}'.format(field.values(f)))
 
