@@ -85,8 +85,8 @@ def read_srational(data, endianness='<'):
  
 
 def get_endianness(open_file):
-    f.seek(0)
-    return '<' if 'I' == f.read(1).decode('utf-8') else '>';
+    open_file.seek(0)
+    return '<' if 'I' == open_file.read(1).decode('utf-8') else '>';
 
 
 def get_ifd_offset(open_file, endianness=None):
@@ -100,31 +100,26 @@ def get_ifd(open_file, offset, endianness=None):
     return ifd, ifd.next
         
 
-def parse_field_type(data, field_type):
-    if field_type == 'ASCII':
-        return data.decode('ascii')
-    if field_type == 'SHORT':
-        return read_short(data, endianness)
-    if field_type == 'LONG':
-        return read_long(data, endianness)
-    if field_type == 'BYTE':
-        return read_byte(data, endianness)
-    if field_type == 'RATIONAL':
-        return read_rational(data, endianness)
-    if field_type == 'SBYTE':
-        return read_sbyte(data, endianness)
-    if field_type == 'UNDEFINED':
-        return read_byte(data, endianness)
-    if field_type == 'SSHORT':
-        return read_sshort(data, endianness)
-    if field_type == 'SRATIONAL':
-        return read_srational(data, endianness)
+_PARSE_FNS = {
+    'ASCII': lambda x, *args, **kwargs: x.decode('ascii'),
+    'SHORT': read_short,
+    'LONG': read_long,
+    'BYTE': read_byte,
+    'RATIONAL': read_rational,
+    'SBYTE': read_sbyte,
+    'UNDEFINED': read_byte,
+    'SSHORT': read_sshort,
+    'SRATIONAL': read_srational
+}
 
+
+def parse_field_type(data, field_type, endianness):
+    return _PARSE_FNS[field_type](data, endianness) 
 
 
 def _get_offset_values(open_file, offset, size, num_vals, field_type, endianness):
     open_file.seek(offset)
-    return [parse_field_type(open_file.read(size), field_type) for i in range(0, num_vals)] 
+    return [parse_field_type(open_file.read(size), field_type, endianness) for i in range(0, num_vals)] 
 
 
 class IFDField(object):
@@ -160,23 +155,28 @@ class IFDField(object):
         if not self.requires_file():
             n = 0
             while n < 4:
-                values.append(parse_field_type(self._offset_or_value[n:n+self.size], self.field_type))
+                val = parse_field_type(self._offset_or_value[n:n+self.size], 
+                        self.field_type, self.endianness)
+                values.append(val)
                 n += self.size
         else:
             if not open_file:
                 raise ValueError('Requires open file')
-            offset = read_integer(self._offset_or_value, endianness)
-            values = _get_offset_values(open_file, offset, self.size, self.num_vals, self.field_type, self.endianness)
+            offset = read_integer(self._offset_or_value, self.endianness)
+            values = _get_offset_values(open_file, offset, self.size, 
+                    self.num_vals, self.field_type, self.endianness)
 
         return values
 
     def __repr__(self):
         val = None
         if self.requires_file():
-            val = 'offset={}'.format(read_integer(self._offset_or_value, self.endianness))
+            val = 'offset={}'.format(read_integer(self._offset_or_value, 
+                self.endianness))
         else:
             val = self.values()
-        return 'IFDField({}, {}, {}, {}, {})'.format(self.tag, self.field_type, self.size, self.num_vals, val);
+        return 'IFDField({}, {}, {}, {}, {})'.format(self.tag, 
+                self.field_type, self.size, self.num_vals, val);
     
 
 class IFD(OrderedDict):
@@ -202,18 +202,26 @@ class IFD(OrderedDict):
             return self[IFD_TAGS[key]]
         super(IFD, self).__getitem__(key)
 
-    def sub_ifds(self):
-        return self.get(IFD_TAGS['SubIFDs'], [])
+    def sub_ifd_offsets(self):
+        return self.get('SubIFDs', [])
 
-    def exif_ifds(self):
-        return self.get(IFD_TAGS['ExifIFD'], [])
+    def exif_ifd_offests(self):
+        return self.get('ExifIFD', [])
+
+    def sub_ifds(self, open_file):
+        offsets = self.sub_ifd_offsets()
+        return [IFD(open_file, offset, self.endianness) for offset in offsets] 
+
+    def exif_ifds(self, open_file):
+        offsets = self.exif_ifd_offsets()
+        return [IFD(open_file, offset, self.endianness) for offset in offsets] 
 
 
 class TiffEp(object):
 
     def __init__(self, f):
-        self.ifd_chain = []
         self.endianness = get_endianness(f)
+        self.ifd_chain = self._parse_ifd_chain(f, self.endianness)
 
     def _parse_ifd_chain(cls, f, endianness):
         result = []
@@ -254,3 +262,4 @@ if __name__ == '__main__':
                         print(field)
                         if field.requires_file():
                             print('\tReal value: {}'.format(field.values(f)))
+
