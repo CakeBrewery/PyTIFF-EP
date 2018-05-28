@@ -15,7 +15,7 @@ IFD_FIELD_TYPES = [(1, 'BYTE'), (1, 'ASCII'), (2, 'SHORT'), (4, 'LONG'), (8, 'RA
         (4, 'FLOAT'), (8, 'DOUBLE')]
 
 
-IFD_TAGS = {
+IFD_TAGS = OrderedDict({
     'NewSubfileType': 254,
     'SubIFDs': 330,
     'ExifIFD': 34665,
@@ -53,10 +53,12 @@ IFD_TAGS = {
     'Contrast': 41992,
     'Saturation': 41993,
     'Sharpness': 41994,
-}
+})
 
 
 # Also keep an inverted IFD_TAGS lookup for convenience.
+# The key, value pairs from d.values() and d.keys() 
+# will be ordered since IFD_TAGS is an OrderedDict
 def invert_key_values(d):
     return type(d)(zip(d.values(), d.keys()))
 IFD_TAGS_INVERTED = invert_key_values(IFD_TAGS)
