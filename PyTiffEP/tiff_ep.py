@@ -35,9 +35,9 @@ IFD_TAGS = {
     'LightSource': 37384,
     'Flash': 37385,
     'FocalLength': 37386,
-    'MakerNote': 37500
+    'MakerNote': 37500,
     'UserComment': 37510,
-    'FlashpixVersion': 40960
+    'FlashpixVersion': 40960,
     'ColorSpace': 40961,
     'PixelXDimension': 40962,
     'PixelYDimension': 40963,
@@ -55,6 +55,11 @@ IFD_TAGS = {
     'Sharpness': 41994,
 }
 
+
+# Also keep an inverted IFD_TAGS lookup for convenience.
+def invert_key_values(d):
+    return type(d)(zip(d.values(), d.keys()))
+IFD_TAGS_INVERTED = invert_key_values(IFD_TAGS)
 
 
 # These are all TIFF-defined data types
@@ -205,12 +210,14 @@ class IFDField(object):
 
     def __repr__(self):
         val = None
+        _name = IFD_TAGS_INVERTED.get(self.tag)
+        tag_name = '{} ({})'.format(self.tag, _name) if _name else self.tag
         if self.requires_file():
             val = 'offset={}'.format(read_integer(self._offset_or_value, 
                 self.endianness))
         else:
             val = self.values()
-        return 'IFDField({}, {}, {}, {}, {})'.format(self.tag, 
+        return 'IFDField({}, {}, {}, {}, {})'.format(tag_name, 
                 self.field_type, self.size, self.num_vals, val);
     
 
