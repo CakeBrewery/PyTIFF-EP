@@ -40,6 +40,7 @@ class TestTiffEP(unittest.TestCase):
                         print('\n--- ExifIFD ---')
                         print_ifd(exif, f)
     
+    @unittest.skip('skip')
     def test_raw_strip_offset(self):
         with open(TEST_FILE, 'rb') as f:
             tiffep = tiff_ep.TiffEp(f)
@@ -47,3 +48,13 @@ class TestTiffEP(unittest.TestCase):
             raw_strip_offsets, ifd = tiff_ep.get_raw_strip_offsets(tiffep, f)
 
             raise NotImplementedError(raw_strip_offsets)
+
+    def test_strips_generator(self):
+        with open(TEST_FILE, 'rb') as f:
+            tiffep = tiff_ep.TiffEp(f)
+
+            strips = tiff_ep.Strips(tiffep, f)
+
+            for strip in strips:
+                print(strip)
+

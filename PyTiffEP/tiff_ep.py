@@ -379,6 +379,45 @@ def get_raw_strip_offsets(tiff_ep, open_file):
                 return offsets, exif_ifd
 
 
+def strip_to_samples(data, bits_per_sample, samples_per_pixel):
+    # TODO: Figure this out
+    pass
+
+
+class Strips(object):
+    def __init__(self, tiff_ep, open_file, chunk_size=None):
+        strip_offsets, ifd = get_raw_strip_offsets(tiff_ep, open_file)
+        strip_byte_counts = ifd.get('StripByteCounts').values()
+        self.strip_offsets = list(zip(strip_offsets, strip_byte_counts))
+        self._file = open_file
+
+        self._n = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        # TODO: Even after tiff "stripping", stripts might be too large in size.
+        # Use chunk_size to further split the strips and somehow integrate
+        # that into this generator ??? 
+        # Perhaps build a generator that automatically abstracts strips
+        # and returns chunks of a given size ?? 
+        while self._n < len(self.strip_offsets):
+            offset, byte_count = self.strip_offsets[self._n]
+            self._n += 1
+
+            self._file.seek(offset)
+            return self._file.read(byte_count)
+        raise StopIteration()
+
+
+def get_row(offset, image_width, bits_per_sample, open_file):
+    pass
+
+
 class TiffEp(object):
 
     def __init__(self, f):
