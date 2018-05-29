@@ -138,8 +138,6 @@ FIRST_4_BYTES_HEX = {
     'Olympus ORF (Little Endian)': ['49', '49', '52', '4f'],
     'Olympus ORF alternate (Little Endian)': ['49', '49', '52', '53'],
     'MDI (Little-Endian)': ['45', '50', '2a', '00']
-
-
 }
 
 
@@ -359,24 +357,24 @@ class IFD(OrderedDict):
 
 
 def _get_raw_strip_offsets(ifd, open_file):
-    subfile_type = sub_ifd.get('NewSubfileType').values(open_file)[0]
-    if subfile_type == 0 and sub_ifd.get('StripOffsets'):
-        return sub_ifd.get('StripOffsets').values()
+    subfile_type = ifd.get('NewSubfileType').values(open_file)[0]
+    if subfile_type == 0 and ifd.get('StripOffsets'):
+        return ifd.get('StripOffsets').values()
 
-def get_raw_strip_offset(tiff_ep, open_file):
+def get_raw_strip_offsets(tiff_ep, open_file):
     # Search for the strip offsets of the first raw image.
     for ifd in tiff_ep.ifd_chain:
-        offsets = get_strip_offsets(ifd, open_file)
+        offsets = _get_raw_strip_offsets(ifd, open_file)
         if offsets:
             return offsets, ifd
 
         for sub_ifd in ifd.sub_ifds(open_file):
-            offsets = get_strip_offsets(sub_ifd, open_file)
+            offsets = _get_raw_strip_offsets(sub_ifd, open_file)
             if offsets:
                 return offsets, sub_ifd 
 
         for exif_ifd in ifd.exif_ifds(open_file):
-            offsets = get_strip_offsets(sub_ifd, open_file)
+            offsets = _get_raw_strip_offsets(sub_ifd, open_file)
             if offsets:
                 return offsets, exif_ifd
 
