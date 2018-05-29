@@ -17,7 +17,29 @@ IFD_FIELD_TYPES = [(1, 'BYTE'), (1, 'ASCII'), (2, 'SHORT'), (4, 'LONG'), (8, 'RA
 
 IFD_TAGS = OrderedDict({
     'NewSubfileType': 254,
+    'SubfileType': 255,
+    'ImageWidth': 256,
+    'ImageLength': 257,
+    'BitsPerSample': 258,
+    'Compression': 259,
+    'PhotometricInterpretation': 262,
+    'ImageDescription': 270,
+    'Make': 271,
+    'Model': 272,
+    'StripOffsets': 273,
+    'Orientation': 274,
+    'SamplesPerPixel': 277,
+    'RowsPerStrip': 278,
+    'StripByteCounts': 279,
+    'MinSampleValue': 280,
+    'MaxSampleValue':281,
+    'XResolution': 282,
+    'YResolution': 283,
+    'PlanarConfiguration': 284,
+    'FreeOffsets': 288,
+    'FreeByteCounts': 289,
     'SubIFDs': 330,
+    'Copyright': 33432,
     'ExifIFD': 34665,
     'ExposureTime': 33434,
     'FNumber': 33437,
@@ -54,6 +76,71 @@ IFD_TAGS = OrderedDict({
     'Saturation': 41993,
     'Sharpness': 41994,
 })
+
+
+COMPRESSION_CODES_NAMES = {
+    1: 'Uncompressed',
+    2: 'CCITTRLE',
+    3: 'CCITTRLE',
+    4: 'CCITT Group 4',
+    5: 'LZW',
+    6: '"Old Style" JPEG',
+    7: '"New Style" JPEG',
+    8: 'DEFLATE',
+    9: 'JBIG',
+    10: 'JBIG',
+    32766: 'NeXT 2-bit RLE',
+    32767: 'Sony ARW',
+    32769: 'Packed RAW / NIKON_PACK',
+    32770: 'Samsung SRW',
+    32771: 'CCITTRLEW',
+    32773: 'PackBits',
+    32809: 'ThunderScan',
+    32867: 'Kodak KDC',
+    32895: 'T8CTPAD, IT8LW, IT8MP, IT8BL',
+    32896: 'T8CTPAD, IT8LW, IT8MP, IT8BL',
+    32897: 'T8CTPAD, IT8LW, IT8MP, IT8BL',
+    32898: 'T8CTPAD, IT8LW, IT8MP, IT8BL',
+    32946: 'DEFLATE',
+    32947: 'Kodak DCS',
+    33003: 'Aperio SVS',
+    33005: 'Aperio SVS',
+    34661: 'JBIG',
+    34676: 'SGILOG',
+    34677: 'SGILOG24',
+    34692: 'LuraDocument Format',
+    34712: 'JPEG 2000',
+    34713: 'Nikon NEF',
+    34715: 'JBIG2',
+    34718: 'MDI',
+    34719: 'MDI',
+    34720: 'MDI',
+    34892: 'Lossy JPEG (DNG)'
+}
+
+
+FIRST_4_BYTES_HEX = {
+    # Big Endian
+    'TIFF (Big-Endian)': ['4d', '4d', '00', '2a'],
+    'BigTIFF (Big-Endian': ['4d', '4d', '00', '2b'],
+    'Panasonic RAW/RW2 (Big-Endian)': ['4d', '4d', '00', '55'],
+    'DNG Camera Profile (Big-Endian)': ['4d', '4d', '43', '52'],
+    'Olympus ORF (Big-Endian)': ['4d', '4d', '4f', '52'],
+    'Olympus ORF alternate (Big-Endian)': ['4d', '4d', '53', '52'],
+
+    # Little Endian
+    'TIFF (Little-Endian)': ['49', '49', '2a', '00'],
+    'BigTIFF (Little-Endian)': ['49', '49', '2b', '00'],
+    'Panasonic RAW/RW2 (Little-Endian)': ['49', '49', '55', '00'],
+    'JPEG XR (Little-Endian)': ['49', '49', 'bc', '01'],
+    'NIFF (Little-Endian)': ['49', '49', '4e', '31'],
+    'DNG Camera Profile (Little-Endian)': ['49', '49', '52', '43'],
+    'Olympus ORF (Little Endian)': ['49', '49', '52', '4f'],
+    'Olympus ORF alternate (Little Endian)': ['49', '49', '52', '53'],
+    'MDI (Little-Endian)': ['45', '50', '2a', '00']
+
+
+}
 
 
 # Also keep an inverted IFD_TAGS lookup for convenience.
@@ -269,6 +356,29 @@ class IFD(OrderedDict):
         if offsets:
             offsets = offsets.values(open_file)
             return [IFD(open_file, offset, self.endianness) for offset in offsets] 
+
+
+def _get_raw_strip_offsets(ifd, open_file):
+    subfile_type = sub_ifd.get('NewSubfileType').values(open_file)[0]
+    if subfile_type == 0 and sub_ifd.get('StripOffsets'):
+        return sub_ifd.get('StripOffsets').values()
+
+def get_raw_strip_offset(tiff_ep, open_file):
+    # Search for the strip offsets of the first raw image.
+    for ifd in tiff_ep.ifd_chain:
+        offsets = get_strip_offsets(ifd, open_file)
+        if offsets:
+            return offsets, ifd
+
+        for sub_ifd in ifd.sub_ifds(open_file):
+            offsets = get_strip_offsets(sub_ifd, open_file)
+            if offsets:
+                return offsets, sub_ifd 
+
+        for exif_ifd in ifd.exif_ifds(open_file):
+            offsets = get_strip_offsets(sub_ifd, open_file)
+            if offsets:
+                return offsets, exif_ifd
 
 
 class TiffEp(object):
